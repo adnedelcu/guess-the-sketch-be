@@ -1,7 +1,7 @@
 import { SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { ErrorCodes, Room, RoomType } from './schemas/room.schema';
-import { Player, PlayerType } from './schemas/player.schema';
-import { Server } from 'http';
+import { Player } from './schemas/player.schema';
+import { Server } from 'socket.io'
 
 @WebSocketGateway({
   cors: {
