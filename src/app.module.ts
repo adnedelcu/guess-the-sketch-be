@@ -7,8 +7,6 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 
-console.log(process.env.JWT_SECRET)
-
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -25,5 +23,3 @@ console.log(process.env.JWT_SECRET)
   providers: [AppService],
 })
 export class AppModule {}
-
-console.log(process.env.JWT_SECRET)

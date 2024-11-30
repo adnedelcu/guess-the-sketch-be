@@ -1,9 +1,10 @@
-import bcrypt from 'bcrypt';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from 'src/dto/register.dto';
 import { LoginDto } from 'src/dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
+import { compare } from 'bcrypt';
+import { instanceToPlain } from 'class-transformer';
 
 @Injectable()
 export class AuthService {
@@ -13,21 +14,25 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<string> {
+    if (await this.usersService.findByEmail(registerDto.email)) {
+      throw new BadRequestException('Email must be unique');
+    }
+
     const user = await this.usersService.create(registerDto);
 
-    const { password, ...result } = user;
-    const token = this.jwtService.sign(result);
+    const { password, ...payload } = user.toObject();
+    const token = this.jwtService.sign(payload);
 
     return token;
   }
 
-  async login(loginDto: LoginDto): Promise<string> {
+  async login(loginDto: LoginDto): Promise<any> {
     const user = await this.usersService.findByEmail(loginDto.email);
-    if (await bcrypt.compare(loginDto.password, user?.password) != true) {
-      throw new UnauthorizedException();
+    if (!user?.password || await compare(loginDto.password, user?.password) != true) {
+      throw new UnauthorizedException('Invalid email or password');
     }
-    const { password, ...result } = user;
-    const token = this.jwtService.sign(result);
+    const { password, ...payload } = user.toObject();
+    const token = this.jwtService.sign(payload);
 
     return token;
   }
