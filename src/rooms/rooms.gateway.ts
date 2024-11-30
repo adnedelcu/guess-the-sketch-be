@@ -34,7 +34,7 @@ export class RoomsGateway {
 
     room.players.set(payload.player._id, Player.fromObject(payload.player));
 
-    this.server.emit('updateRoom', { room });
+    this.server.emit('updateRoom', { room: room.toPlain() });
 
     return { error: false, message: 'Player joined the room' };
   }
@@ -54,7 +54,7 @@ export class RoomsGateway {
     room.players.delete(player._id);
     this.rooms.set(room.code, room);
 
-    this.server.emit('updateRoom', { room });
+    this.server.emit('updateRoom', { room: room.toPlain() });
 
     return { error: false, message: 'Player left room' };
   }
@@ -95,6 +95,37 @@ export class RoomsGateway {
     this.server.emit('updateRoom', { room: room.toPlain() });
 
     return { error: false, room: room.toPlain(), player };
+  }
+
+  @SubscribeMessage('startGame')
+  handleStartGame(client: any, payload: any): any {
+    const room = this.rooms.get(payload.code);
+    if (!room) {
+      return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
+    }
+
+    room.hasStarted = true;
+    this.rooms.set(room.code, room);
+
+    this.server.emit('updateRoom', { room: room.toPlain() });
+
+    return { error: false, room: room.toPlain() };
+  }
+
+  @SubscribeMessage('updateRoomCanvas')
+  handleUpdateRoomCanvas(client: any, payload: any): any {
+    const room = this.rooms.get(payload.room.code);
+    if (!room) {
+      return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
+    }
+
+    console.log('updateRoomCanvas', payload);
+
+    room.canvas = payload.canvas;
+
+    this.server.emit('updateRoomCanvas', { playerId: payload.playerId, room: room.toPlain() });
+
+    return { error: false, room: room.toPlain() };
   }
 
   @SubscribeMessage('message')

@@ -10,8 +10,10 @@ export type RoomType = {
   code: string
   name: string
   isPrivate: boolean
+  hasStarted: boolean
   owner: PlayerType
   maxPlayers: number
+  canvas: any
   players: Map<string, PlayerType>
   toPlain(): object
 }
@@ -20,8 +22,10 @@ export class Room implements RoomType {
   code: string
   name: string
   isPrivate: boolean
+  hasStarted: boolean = false
   owner: PlayerType
   maxPlayers: number
+  canvas: any
   players: Map<string, PlayerType>
 
   constructor(
@@ -30,6 +34,7 @@ export class Room implements RoomType {
     isPrivate: boolean = false,
     owner: PlayerType = new Player(),
     maxPlayers: number = 0,
+    canvas: any = '',
     players: Map<string, PlayerType> = new Map()
   ) {
     this.code = code
@@ -37,6 +42,7 @@ export class Room implements RoomType {
     this.isPrivate = isPrivate
     this.owner = owner
     this.maxPlayers = maxPlayers
+    this.canvas = canvas
     this.players = players
   }
 
@@ -52,6 +58,7 @@ export class Room implements RoomType {
       room.isPrivate,
       room.owner,
       room.maxPlayers,
+      room.canvas,
       players,
     );
   }
