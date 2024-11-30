@@ -1,10 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { injectSpeedInsights } from '@vercel/speed-insights';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-
-injectSpeedInsights();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

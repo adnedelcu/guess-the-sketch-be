@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
+import { RoomsGateway } from './rooms/rooms.gateway';
 
 @Module({
   imports: [
@@ -20,6 +21,6 @@ import { JwtModule } from '@nestjs/jwt';
     }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, RoomsGateway],
 })
 export class AppModule {}
