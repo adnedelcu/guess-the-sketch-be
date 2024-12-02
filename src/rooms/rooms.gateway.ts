@@ -52,7 +52,7 @@ export class RoomsGateway {
       return { error: true, errorCode: ErrorCodes.PlayerAlreadyInRoom, message: 'Player already in the room' };
     }
 
-    if (room.players.size + 1 >= room.maxPlayers) {
+    if (room.players.size + 1 > room.maxPlayers) {
       return { error: true, errorCode: ErrorCodes.MaxPlayersReached, message: 'Room is already full' };
     }
 
