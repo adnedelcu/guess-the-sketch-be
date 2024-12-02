@@ -12,6 +12,7 @@ export type ChatEntryType = {
   message: string
   date: Date
   delivered: boolean
+  buzz: boolean
 }
 
 export class ChatEntry implements ChatEntryType {
@@ -19,17 +20,20 @@ export class ChatEntry implements ChatEntryType {
   message: string
   date: Date
   delivered: boolean
+  buzz: boolean
 
   constructor(
     playerId: string = '',
     message: string = '',
     date: Date = new Date(),
     delivered: boolean = false,
+    buzz: boolean = false,
   ) {
     this.playerId = playerId;
     this.message = message;
     this.date = date;
     this.delivered = delivered;
+    this.buzz = buzz;
   }
 
   static fromObject(chatEntry): ChatEntryType {
@@ -38,6 +42,7 @@ export class ChatEntry implements ChatEntryType {
       chatEntry.message,
       chatEntry.date,
       chatEntry.delivered || true,
+      chatEntry.buzz || false,
     );
   }
 }

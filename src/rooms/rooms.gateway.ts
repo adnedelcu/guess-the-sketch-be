@@ -155,7 +155,7 @@ export class RoomsGateway {
     console.log('updateChatHistory', payload);
 
     console.log(room.chatHistory);
-    room.chatHistory.push(new ChatEntry(payload.player._id, payload.message, new Date(), true));
+    room.chatHistory.push(new ChatEntry(payload.player._id, payload.message || null, new Date(), true, payload.buzz || false));
     console.log(room.chatHistory);
     this.rooms.set(room.code, room);
 
