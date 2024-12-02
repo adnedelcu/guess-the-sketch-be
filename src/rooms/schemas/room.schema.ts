@@ -7,6 +7,41 @@ export enum ErrorCodes {
   MaxPlayersReached = "max_players_reached",
 }
 
+export type ChatEntryType = {
+  playerId: string
+  message: string
+  date: Date
+  delivered: boolean
+}
+
+export class ChatEntry implements ChatEntryType {
+  playerId: string
+  message: string
+  date: Date
+  delivered: boolean
+
+  constructor(
+    playerId: string = '',
+    message: string = '',
+    date: Date = new Date(),
+    delivered: boolean = false,
+  ) {
+    this.playerId = playerId;
+    this.message = message;
+    this.date = date;
+    this.delivered = delivered;
+  }
+
+  static fromObject(chatEntry): ChatEntryType {
+    return new ChatEntry(
+      chatEntry.playerId,
+      chatEntry.message,
+      chatEntry.date,
+      chatEntry.delivered || true,
+    );
+  }
+}
+
 export type RoomType = {
   code: string
   name: string
@@ -16,6 +51,7 @@ export type RoomType = {
   maxPlayers: number
   canvas: any
   players: Map<string, PlayerType>
+  chatHistory: ChatEntry[]
   toPlain(): object
 }
 
@@ -28,6 +64,7 @@ export class Room implements RoomType {
   maxPlayers: number
   canvas: any
   players: Map<string, PlayerType>
+  chatHistory: ChatEntry[] = []
 
   constructor(
     code: string = '',
@@ -36,7 +73,8 @@ export class Room implements RoomType {
     owner: PlayerType = new Player(),
     maxPlayers: number = 0,
     canvas: any = '',
-    players: Map<string, PlayerType> = new Map()
+    players: Map<string, PlayerType> = new Map(),
+    chatHistory: ChatEntry[] = [],
   ) {
     this.code = code
     this.name = name
@@ -45,6 +83,7 @@ export class Room implements RoomType {
     this.maxPlayers = maxPlayers
     this.canvas = canvas
     this.players = players
+    this.chatHistory = chatHistory
   }
 
   static fromObject(room: any): RoomType {
@@ -61,6 +100,7 @@ export class Room implements RoomType {
       room.maxPlayers,
       room.canvas,
       players,
+      room.chatHistory,
     );
   }
 

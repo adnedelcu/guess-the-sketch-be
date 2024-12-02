@@ -1,5 +1,5 @@
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { ErrorCodes, Room, RoomType } from './schemas/room.schema';
+import { ChatEntry, ErrorCodes, Room, RoomType } from './schemas/room.schema';
 import { Player } from './schemas/player.schema';
 import { Server, Socket } from 'socket.io'
 
@@ -138,8 +138,28 @@ export class RoomsGateway {
     console.log('updateRoomCanvas', payload);
 
     room.canvas = payload.canvas;
+    this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateRoomCanvas', { playerId: payload.playerId, room: room.toPlain() });
+
+    return { error: false, room: room.toPlain() };
+  }
+
+  @SubscribeMessage('sendMessage')
+  handleSendMessage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    const room = this.rooms.get(payload.code);
+    if (!room) {
+      return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
+    }
+
+    console.log('updateChatHistory', payload);
+
+    console.log(room.chatHistory);
+    room.chatHistory.push(new ChatEntry(payload.player._id, payload.message, new Date(), true));
+    console.log(room.chatHistory);
+    this.rooms.set(room.code, room);
+
+    this.server.to(payload.code).emit('updateChatHistory', { room });
 
     return { error: false, room: room.toPlain() };
   }
