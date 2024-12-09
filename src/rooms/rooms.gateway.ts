@@ -168,8 +168,9 @@ export class RoomsGateway implements OnGatewayInit {
     room.hasStarted = true;
     room.game = new Game();
     room.game.stages = new Map<string, GameStageType>();
-    const gameStage = new GameStage(Stage.Draw, room.owner, Game.randomAnimal());
-    room.game.stages.set(uuid.v4(), gameStage);
+    let prevGameStage = new GameStage(Stage.Draw, room.owner, Game.randomAnimal());
+    let prevUuid = uuid.v4();
+    room.game.stages.set(prevUuid, prevGameStage);
     let nextStage = Stage.Guess;
 
     const players = [...room.players.values()];
@@ -182,10 +183,17 @@ export class RoomsGateway implements OnGatewayInit {
       if (player._id === room.owner._id) {
         continue;
       }
-      room.game.stages.set(uuid.v4(), new GameStage(nextStage, player));
+      const newGameStage = new GameStage(nextStage, player);
+      const newUuid = uuid.v4();
+      prevGameStage.nextStage = newUuid;
+      room.game.stages.set(prevUuid, prevGameStage);
+      room.game.stages.set(newUuid, newGameStage);
       nextStage = nextStage == Stage.Guess ? Stage.Draw : Stage.Guess;
+      prevGameStage = newGameStage;
+      prevUuid = newUuid;
     }
-    console.log(room);
+    room.game.activeStage = [...room.game.stages.keys()][0];
+    console.log(room, room.toPlain());
     this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
@@ -195,7 +203,7 @@ export class RoomsGateway implements OnGatewayInit {
 
   @SubscribeMessage('updateRoomCanvas')
   handleUpdateRoomCanvas(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
-    const room = this.rooms.get(payload.room.code);
+    const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
@@ -210,16 +218,57 @@ export class RoomsGateway implements OnGatewayInit {
 
   @SubscribeMessage('advanceStage')
   handleAdvanceStage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
-    const room = this.rooms.get(payload.room.code);
+    const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
 
     const currentStage = room.game.stages.get(room.game.activeStage);
+    console.log(currentStage);
     if (payload.guess) {
       currentStage.word = payload.guess;
+      room.game.stages.set(room.game.activeStage, currentStage);
+      this.rooms.set(payload.code, room);
     }
+    if (payload.canvas) {
+      currentStage.canvas = payload.canvas;
+      room.game.stages.set(room.game.activeStage, currentStage);
+      this.rooms.set(payload.code, room);
+    }
+    console.log(currentStage);
+
+    if (!currentStage.nextStage) {
+      room.isFinished = true;
+      this.rooms.set(payload.code, room);
+
+      this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
+
+      setTimeout(() => {
+        this.server.of('/').adapter.rooms.delete(payload.code);
+        this.rooms.delete(payload.code);
+
+
+      }, 60000);
+
+      return { error: false, room: room.toPlain() };
+    }
+
     room.game.activeStage = currentStage.nextStage;
+    const activeStage = room.game.stages.get(room.game.activeStage);
+    if (payload.guess) {
+      activeStage.word = currentStage.word;
+      room.game.stages.set(room.game.activeStage, activeStage);
+      this.rooms.set(payload.code, room);
+    }
+    if (payload.canvas) {
+      activeStage.canvas = currentStage.canvas;
+      room.game.stages.set(room.game.activeStage, activeStage);
+      this.rooms.set(payload.code, room);
+    }
+
+    this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
+
+    return { error: false, room: room.toPlain() };
   }
 
   @SubscribeMessage('sendMessage')

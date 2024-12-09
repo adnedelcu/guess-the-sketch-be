@@ -145,6 +145,7 @@ export class GameStage implements GameStageType {
 export type GameType = {
   stages: Map<string, GameStageType>,
   activeStage?: string,
+  toPlain(): object;
 }
 
 export class Game implements GameType {
@@ -181,5 +182,12 @@ export class Game implements GameType {
     const object = this.randomObject();
 
     return `${animal} ${action} ${object[0] == 'a' ? `an ${object}` : `a ${object}`}`;
+  }
+
+  toPlain(): object {
+    return {
+      stages: Object.fromEntries(this.stages.entries()),
+      activeStage: this.activeStage,
+    }
   }
 }

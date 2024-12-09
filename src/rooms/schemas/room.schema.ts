@@ -1,4 +1,4 @@
-import { Game, GameType } from "./game.schema"
+import { Game, GameStage, GameType } from "./game.schema"
 import { Player, PlayerType } from "./player.schema"
 
 export enum ErrorCodes {
@@ -37,7 +37,7 @@ export class ChatEntry implements ChatEntryType {
     this.buzz = buzz;
   }
 
-  static fromObject(chatEntry): ChatEntryType {
+  static fromObject(chatEntry: any): ChatEntryType {
     return new ChatEntry(
       chatEntry.playerId,
       chatEntry.message,
@@ -53,6 +53,7 @@ export type RoomType = {
   name: string
   isPrivate: boolean
   hasStarted: boolean
+  isFinished: boolean
   owner: PlayerType
   maxPlayers: number
   canvas: any
@@ -67,6 +68,7 @@ export class Room implements RoomType {
   name: string
   isPrivate: boolean
   hasStarted: boolean = false
+  isFinished: boolean = false
   owner: PlayerType
   maxPlayers: number
   canvas: any
@@ -105,7 +107,7 @@ export class Room implements RoomType {
     const game = new Game();
     const gameStages = new Map();
     for (let stageId in room.game.stages) {
-      gameStages.set(stageId, room.game.stages[stageId]);
+      gameStages.set(stageId, GameStage.fromObject(room.game.stages[stageId]));
     }
     game.stages = gameStages;
     game.activeStage = room.game.activeStage;
@@ -127,7 +129,7 @@ export class Room implements RoomType {
     return {
       ...this,
       players: Object.fromEntries(this.players.entries()),
-      game: Game.fromObject(this.game),
+      game: this.game.toPlain(),
     }
   }
 }
