@@ -1,5 +1,7 @@
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose"
 import { Game, GameStage, GameType } from "./game.schema"
 import { Player, PlayerType } from "./player.schema"
+import mongoose, { HydratedDocument } from "mongoose"
 
 export enum ErrorCodes {
   RoomNotFound = 'room_not_found',
@@ -63,17 +65,28 @@ export type RoomType = {
   toPlain(): object
 }
 
+export type RoomDocument = HydratedDocument<Room>;
+
+@Schema()
 export class Room implements RoomType {
+  @Prop()
   code: string
+  @Prop()
   name: string
+  @Prop()
   isPrivate: boolean
   hasStarted: boolean = false
   isFinished: boolean = false
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   owner: PlayerType
+  @Prop()
   maxPlayers: number
   canvas: any
+  @Prop()
   players: Map<string, PlayerType>
+  @Prop()
   chatHistory: ChatEntry[] = []
+  @Prop({ type: mongoose.Schema.Types.Map })
   game: GameType
 
   constructor(
@@ -133,3 +146,5 @@ export class Room implements RoomType {
     }
   }
 }
+
+export const RoomSchema = SchemaFactory.createForClass(Room);

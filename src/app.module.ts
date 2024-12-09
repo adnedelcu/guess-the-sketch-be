@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { RoomsGateway } from './rooms/rooms.gateway';
+import { Room, RoomSchema } from './rooms/schemas/room.schema';
+import { RoomsService } from './rooms/rooms.service';
 
 @Module({
   imports: [
@@ -14,6 +16,7 @@ import { RoomsGateway } from './rooms/rooms.gateway';
     MongooseModule.forRoot(process.env.MONGO_URI),
     AuthModule,
     UsersModule,
+    MongooseModule.forFeature([{ name: Room.name, schema: RoomSchema }]),
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
@@ -21,6 +24,7 @@ import { RoomsGateway } from './rooms/rooms.gateway';
     }),
   ],
   controllers: [AppController],
-  providers: [AppService, RoomsGateway],
+  providers: [AppService, RoomsGateway, RoomsService],
+  exports: [RoomsService]
 })
 export class AppModule {}

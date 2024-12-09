@@ -5,9 +5,12 @@ import { Player } from './schemas/player.schema';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { Game, GameStage, GameStageType, Stage } from './schemas/game.schema';
+import { RoomsService } from './rooms.service';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class RoomsGateway implements OnGatewayInit {
+  constructor(private readonly roomsService: RoomsService) {}
+
   @WebSocketServer()
   private readonly server: Server;
 
@@ -193,7 +196,7 @@ export class RoomsGateway implements OnGatewayInit {
       prevUuid = newUuid;
     }
     room.game.activeStage = [...room.game.stages.keys()][0];
-    console.log(room, room.toPlain());
+    // console.log(room, room.toPlain());
     this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
@@ -224,7 +227,6 @@ export class RoomsGateway implements OnGatewayInit {
     }
 
     const currentStage = room.game.stages.get(room.game.activeStage);
-    console.log(currentStage);
     if (payload.guess) {
       currentStage.word = payload.guess;
       room.game.stages.set(room.game.activeStage, currentStage);
@@ -235,7 +237,6 @@ export class RoomsGateway implements OnGatewayInit {
       room.game.stages.set(room.game.activeStage, currentStage);
       this.rooms.set(payload.code, room);
     }
-    console.log(currentStage);
 
     if (!currentStage.nextStage) {
       room.isFinished = true;
@@ -243,11 +244,11 @@ export class RoomsGateway implements OnGatewayInit {
 
       this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
 
+      this.roomsService.create(room);
+
       setTimeout(() => {
         this.server.of('/').adapter.rooms.delete(payload.code);
         this.rooms.delete(payload.code);
-
-
       }, 60000);
 
       return { error: false, room: room.toPlain() };
