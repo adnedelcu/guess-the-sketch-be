@@ -1,3 +1,4 @@
+import { Game, GameType } from "./game.schema"
 import { Player, PlayerType } from "./player.schema"
 
 export enum ErrorCodes {
@@ -57,6 +58,7 @@ export type RoomType = {
   canvas: any
   players: Map<string, PlayerType>
   chatHistory: ChatEntry[]
+  game: GameType
   toPlain(): object
 }
 
@@ -70,6 +72,7 @@ export class Room implements RoomType {
   canvas: any
   players: Map<string, PlayerType>
   chatHistory: ChatEntry[] = []
+  game: GameType
 
   constructor(
     code: string = '',
@@ -80,15 +83,17 @@ export class Room implements RoomType {
     canvas: any = '',
     players: Map<string, PlayerType> = new Map(),
     chatHistory: ChatEntry[] = [],
+    game: GameType = new Game(),
   ) {
     this.code = code
     this.name = name
     this.isPrivate = isPrivate
-    this.owner = owner
+    this.owner = Player.fromObject(owner)
     this.maxPlayers = maxPlayers
     this.canvas = canvas
     this.players = players
     this.chatHistory = chatHistory
+    this.game = game
   }
 
   static fromObject(room: any): RoomType {
@@ -96,6 +101,14 @@ export class Room implements RoomType {
     for (let playerId in room.players) {
       players.set(playerId, room.players[playerId]);
     }
+
+    const game = new Game();
+    const gameStages = new Map();
+    for (let stageId in room.game.stages) {
+      gameStages.set(stageId, room.game.stages[stageId]);
+    }
+    game.stages = gameStages;
+    game.activeStage = room.game.activeStage;
 
     return new Room(
       room.code,
@@ -106,13 +119,15 @@ export class Room implements RoomType {
       room.canvas,
       players,
       room.chatHistory,
+      game,
     );
   }
 
   toPlain(): object {
     return {
       ...this,
-      players: Object.fromEntries(this.players.entries())
+      players: Object.fromEntries(this.players.entries()),
+      game: Game.fromObject(this.game),
     }
   }
 }

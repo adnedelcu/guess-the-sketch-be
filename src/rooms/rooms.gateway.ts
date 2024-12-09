@@ -1,18 +1,55 @@
-import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import * as uuid from 'uuid';
+import { ConnectedSocket, MessageBody, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { ChatEntry, ErrorCodes, Room, RoomType } from './schemas/room.schema';
 import { Player } from './schemas/player.schema';
-import { Server, Socket } from 'socket.io'
+import { Server, Socket } from 'socket.io';
+import { Logger } from '@nestjs/common';
+import { Game, GameStage, GameStageType, Stage } from './schemas/game.schema';
 
-@WebSocketGateway({
-  cors: {
-    origin: '*'
-  }
-})
-export class RoomsGateway {
+@WebSocketGateway({ cors: { origin: '*' } })
+export class RoomsGateway implements OnGatewayInit {
   @WebSocketServer()
-  server: Server
+  private readonly server: Server;
 
-  private readonly rooms:Map<string, RoomType> = new Map();
+  private readonly rooms: Map<string, RoomType> = new Map();
+
+  private readonly logger: Logger = new Logger('RoomsGateway');
+
+  afterInit(server: Server) {
+    this.logger.log('Initialized');
+    server.on('connection', (socket) => {
+      socket.on('disconnecting', () => {
+        for (let roomCode of Array.from(socket.rooms)) {
+          if (!this.rooms.has(roomCode)) {
+            continue;
+          }
+
+          const room = this.rooms.get(roomCode);
+
+          if (!room.hasStarted) {
+            const players = Array.from(room.players.values());
+            const player = players.find((player: Player) => player.socketId == socket.id);
+            if (player) {
+              room.players.delete(player._id);
+            }
+            if (room.owner.socketId == socket.id) {
+              room.owner = Object.values(room.players)[0];
+              room.owner = Array.from(room.players.values())[0];
+            }
+
+            if (room.players.size == 0) {
+              this.rooms.delete(roomCode);
+            } else {
+              server.to(roomCode).emit('updateRoom', { room: room.toPlain() });
+            }
+          }
+          socket.leave(roomCode);
+        }
+      })
+      socket.on('disconnect', () => {
+      })
+    });
+  }
 
   @SubscribeMessage('getRoom')
   handleGetRoom(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
@@ -33,16 +70,20 @@ export class RoomsGateway {
 
   @SubscribeMessage('createRoom')
   handleCreateRoom(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
-    console.log(payload);
+    this.logger.log(`Client ${client.id} creates room ${payload.code}.`);
+    payload.room.owner.socketId = client.id;
+    payload.room.players[payload.room.owner._id].socketId = client.id;
     this.rooms.set(payload.code, Room.fromObject(payload.room));
 
     client.join(payload.code);
+    this.logger.log(`Client ${client.id} created and joined room ${payload.code}.`);
 
     return { rooms: this.rooms };
   }
 
   @SubscribeMessage('joinRoom')
   handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    this.logger.log(`Client ${client.id} joins room ${payload.code}.`);
     if (!this.rooms.has(payload.code)) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
@@ -56,16 +97,18 @@ export class RoomsGateway {
       return { error: true, errorCode: ErrorCodes.MaxPlayersReached, message: 'Room is already full' };
     }
 
-    room.players.set(payload.player._id, Player.fromObject(payload.player));
+    room.players.set(payload.player._id, Player.fromObject({...payload.player, socketId: client.id}));
 
     client.join(payload.code);
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
+    this.logger.log(`Client ${client.id} joined room ${payload.code}.`);
 
     return { error: false, message: 'Player joined the room' };
   }
 
   @SubscribeMessage('leaveRoom')
   handleLeaveRoom(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    this.logger.log(`Client ${client.id} leaves room ${payload.code}.`);
     const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
@@ -88,18 +131,19 @@ export class RoomsGateway {
       this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
     }
     client.leave(payload.code);
+    this.logger.log(`Client ${client.id} left room ${payload.code}.`);
 
     return { error: false, message: 'Player left room' };
   }
 
   @SubscribeMessage('toggleReady')
   handleToggleReady(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
-    const room = this.rooms.get(payload.room.code);
+    const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
 
-    const player = room.players.get(payload.player._id);
+    const player = room.players.get(payload.playerId);
     if (!player) {
       return { error: true, errorCode: ErrorCodes.PlayerNotFound, message: 'Player not found in the room' };
     }
@@ -107,6 +151,7 @@ export class RoomsGateway {
     player.ready = !player.ready;
     room.players.set(player._id, player);
     this.rooms.set(room.code, room);
+    this.logger.log(`Client ${client.id} (Player ${player._id}) toggled ready check. Current status:${player.ready ? '' : ' not'} ready`);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
 
@@ -121,6 +166,26 @@ export class RoomsGateway {
     }
 
     room.hasStarted = true;
+    room.game = new Game();
+    room.game.stages = new Map<string, GameStageType>();
+    const gameStage = new GameStage(Stage.Draw, room.owner, Game.randomAnimal());
+    room.game.stages.set(uuid.v4(), gameStage);
+    let nextStage = Stage.Guess;
+
+    const players = [...room.players.values()];
+    for (let i = players.length - 1; i >= 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+
+    for (const player of players) {
+      if (player._id === room.owner._id) {
+        continue;
+      }
+      room.game.stages.set(uuid.v4(), new GameStage(nextStage, player));
+      nextStage = nextStage == Stage.Guess ? Stage.Draw : Stage.Guess;
+    }
+    console.log(room);
     this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
@@ -135,8 +200,6 @@ export class RoomsGateway {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
 
-    console.log('updateRoomCanvas', payload);
-
     room.canvas = payload.canvas;
     this.rooms.set(room.code, room);
 
@@ -145,21 +208,33 @@ export class RoomsGateway {
     return { error: false, room: room.toPlain() };
   }
 
+  @SubscribeMessage('advanceStage')
+  handleAdvanceStage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    const room = this.rooms.get(payload.room.code);
+    if (!room) {
+      return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
+    }
+
+    const currentStage = room.game.stages.get(room.game.activeStage);
+    if (payload.guess) {
+      currentStage.word = payload.guess;
+    }
+    room.game.activeStage = currentStage.nextStage;
+  }
+
   @SubscribeMessage('sendMessage')
   handleSendMessage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    this.logger.log(`Client ${client.id} sending "${!payload.buzz ? ` message ${payload.message}` : 'buzz'}" to room ${payload.code}.`);
     const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
 
-    console.log('updateChatHistory', payload);
-
-    console.log(room.chatHistory);
     room.chatHistory.push(new ChatEntry(payload.player._id, payload.message || null, new Date(), true, payload.buzz || false));
-    console.log(room.chatHistory);
     this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateChatHistory', { room });
+    this.logger.log(`Client ${client.id} sending "${!payload.buzz ? ` message ${payload.message}` : 'buzz'}" to room ${payload.code}.`);
 
     return { error: false, room: room.toPlain() };
   }

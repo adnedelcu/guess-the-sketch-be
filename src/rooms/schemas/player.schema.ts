@@ -1,5 +1,6 @@
 export type PlayerType = {
   _id: string
+  socketId: string,
   firstName: string
   lastName: string
   email: string
@@ -9,6 +10,7 @@ export type PlayerType = {
 
 export class Player implements PlayerType {
   _id: string
+  socketId: string
   firstName: string
   lastName: string
   email: string
@@ -17,6 +19,7 @@ export class Player implements PlayerType {
 
   constructor(
     _id: string = '',
+    socketId: string = '',
     firstName: string = '',
     lastName: string = '',
     email: string = '',
@@ -24,6 +27,7 @@ export class Player implements PlayerType {
     ready: boolean = false,
   ) {
     this._id = _id;
+    this.socketId = socketId;
     this.firstName = firstName;
     this.lastName = lastName;
     this.email = email;
@@ -34,6 +38,7 @@ export class Player implements PlayerType {
   static fromObject(player: any): PlayerType {
     return new Player(
       player._id,
+      player.socketId,
       player.firstName,
       player.lastName,
       player.email,
