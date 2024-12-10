@@ -1,7 +1,9 @@
 {
   "buildCommand": "yarn build",
   "functions": {
-    "dist/main.js": {}
+    "dist/main.js": {
+      "runtime": "@vercel/node"
+    }
   },
   "installCommand": "yarn install",
   "outputDirectory": "dist",
