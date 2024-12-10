@@ -2,7 +2,7 @@
   "buildCommand": "yarn build",
   "functions": {
     "dist/main.js": {
-      "runtime": "@vercel/node@20"
+      "runtime": "@vercel/node@20.x"
     }
   },
   "installCommand": "yarn install",
