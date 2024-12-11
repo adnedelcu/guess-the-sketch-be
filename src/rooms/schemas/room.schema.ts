@@ -58,6 +58,8 @@ export type RoomType = {
   isFinished: boolean
   owner: PlayerType
   maxPlayers: number
+  timeForDrawing: number
+  timeForGuessing: number
   canvas: any
   players: Map<string, PlayerType>
   chatHistory: ChatEntry[]
@@ -81,6 +83,10 @@ export class Room implements RoomType {
   owner: PlayerType
   @Prop()
   maxPlayers: number
+  @Prop()
+  timeForDrawing: number
+  @Prop()
+  timeForGuessing: number
   canvas: any
   @Prop()
   players: Map<string, PlayerType>
@@ -95,6 +101,8 @@ export class Room implements RoomType {
     isPrivate: boolean = false,
     owner: PlayerType = new Player(),
     maxPlayers: number = 0,
+    timeForDrawing: number = 0,
+    timeForGuessing: number = 0,
     canvas: any = '',
     players: Map<string, PlayerType> = new Map(),
     chatHistory: ChatEntry[] = [],
@@ -105,6 +113,8 @@ export class Room implements RoomType {
     this.isPrivate = isPrivate
     this.owner = Player.fromObject(owner)
     this.maxPlayers = maxPlayers
+    this.timeForDrawing = timeForDrawing
+    this.timeForGuessing = timeForGuessing
     this.canvas = canvas
     this.players = players
     this.chatHistory = chatHistory
@@ -131,6 +141,8 @@ export class Room implements RoomType {
       room.isPrivate,
       room.owner,
       room.maxPlayers,
+      room.timeForDrawing,
+      room.timeForGuessing,
       room.canvas,
       players,
       room.chatHistory,
