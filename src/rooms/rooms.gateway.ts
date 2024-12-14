@@ -238,7 +238,7 @@ export class RoomsGateway implements OnGatewayInit {
 
   @SubscribeMessage('advanceStage')
   handleAdvanceStage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
-    this.logger.log(`[handleAdvanceStage] Room: ${JSON.stringify(payload)}`)
+    this.logger.log(`[handleAdvanceStage] Room: ${payload.code}`)
     const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
