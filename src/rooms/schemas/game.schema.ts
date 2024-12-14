@@ -105,6 +105,7 @@ export enum Stage {
 export type GameStageType = {
   stage: Stage,
   player: PlayerType,
+  ttl: number,
   word: string,
   canvas: string,
   nextStage?: string;
@@ -113,6 +114,7 @@ export type GameStageType = {
 export class GameStage implements GameStageType {
   stage: Stage;
   player: PlayerType;
+  ttl: number;
   word: string;
   canvas: string;
   nextStage?: string;
@@ -120,12 +122,14 @@ export class GameStage implements GameStageType {
   constructor(
     stage: Stage,
     player: PlayerType,
+    ttl: number = 0,
     word: string = '',
     canvas: string = '',
     nextStage: string|undefined = '',
   ) {
     this.stage = stage;
     this.player = player;
+    this.ttl = ttl;
     this.word = word;
     this.canvas = canvas;
     this.nextStage = nextStage;
@@ -135,6 +139,7 @@ export class GameStage implements GameStageType {
     return new GameStage(
       gameStage.stage,
       gameStage.player instanceof Player ? gameStage.player : Player.fromObject(gameStage.player),
+      gameStage.ttl,
       gameStage.word,
       gameStage.canvas,
       gameStage.nextStage,
