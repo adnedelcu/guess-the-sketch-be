@@ -15,6 +15,7 @@ export class RoomsGateway implements OnGatewayInit {
   private readonly server: Server;
 
   private readonly rooms: Map<string, RoomType> = new Map();
+  private readonly timers: Map<string, NodeJS.Timeout> = new Map();
 
   private readonly logger: Logger = new Logger('RoomsGateway');
 
@@ -42,6 +43,7 @@ export class RoomsGateway implements OnGatewayInit {
 
             if (room.players.size == 0) {
               this.rooms.delete(roomCode);
+              this.timers.delete(room.code);
             } else {
               server.to(roomCode).emit('updateRoom', { room: room.toPlain() });
             }
@@ -125,6 +127,7 @@ export class RoomsGateway implements OnGatewayInit {
     room.players.delete(player._id);
     if (!room.players.size) {
       this.rooms.delete(room.code);
+      this.timers.delete(room.code);
     } else {
       if (player._id == room.owner._id && room.players.size) {
         room.owner = [...room.players.values()][0];
@@ -171,7 +174,7 @@ export class RoomsGateway implements OnGatewayInit {
     room.hasStarted = true;
     room.game = new Game();
     room.game.stages = new Map<string, GameStageType>();
-    let prevGameStage = new GameStage(Stage.Draw, room.owner, Game.randomAnimal());
+    let prevGameStage = new GameStage(Stage.Draw, room.owner, room.timeForDrawing, Game.randomAnimal());
     let prevUuid = uuid.v4();
     room.game.stages.set(prevUuid, prevGameStage);
     let nextStage = Stage.Guess;
@@ -186,7 +189,7 @@ export class RoomsGateway implements OnGatewayInit {
       if (player._id === room.owner._id) {
         continue;
       }
-      const newGameStage = new GameStage(nextStage, player);
+      const newGameStage = new GameStage(nextStage, player, nextStage === Stage.Draw ? room.timeForDrawing : room.timeForGuessing);
       const newUuid = uuid.v4();
       prevGameStage.nextStage = newUuid;
       room.game.stages.set(prevUuid, prevGameStage);
@@ -197,6 +200,16 @@ export class RoomsGateway implements OnGatewayInit {
     }
     room.game.activeStage = [...room.game.stages.keys()][0];
     // console.log(room, room.toPlain());
+    this.timers[payload.code] = setInterval(() => {
+      const stage = room.game.stages.get(room.game.activeStage);
+      stage.ttl--;
+      room.game.stages.set(room.game.activeStage, stage);
+      this.rooms.set(room.code, room);
+      this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
+      if (stage.ttl === 0) {
+        clearInterval(this.timers[payload.code]);
+      }
+    }, 1000);
     this.rooms.set(room.code, room);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
@@ -211,16 +224,21 @@ export class RoomsGateway implements OnGatewayInit {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
     }
 
-    room.canvas = payload.canvas;
+    this.logger.log(`[updateRoomCanvas] updating current stage canvas for room ${payload.code}. Content size: ${payload.canvas.length}`);
+
+    const activeStage = room.game.stages.get(room.game.activeStage);
+    activeStage.canvas = payload.canvas;
+    room.game.stages.set(room.game.activeStage, activeStage);
     this.rooms.set(room.code, room);
 
-    this.server.to(payload.code).emit('updateRoomCanvas', { playerId: payload.playerId, room: room.toPlain() });
+    this.server.to(payload.code).emit('updateRoomCanvas', { playerId: payload.playerId, room: room.toPlain(), canvas: activeStage.canvas });
 
     return { error: false, room: room.toPlain() };
   }
 
   @SubscribeMessage('advanceStage')
   handleAdvanceStage(@ConnectedSocket() client: Socket, @MessageBody() payload: any): any {
+    this.logger.log(`[handleAdvanceStage] Room: ${JSON.stringify(payload)}`)
     const room = this.rooms.get(payload.code);
     if (!room) {
       return { error: true, errorCode: ErrorCodes.RoomNotFound, message: 'Room does not exist' };
@@ -266,6 +284,20 @@ export class RoomsGateway implements OnGatewayInit {
       room.game.stages.set(room.game.activeStage, activeStage);
       this.rooms.set(payload.code, room);
     }
+
+    this.logger.log(`[handleAdvanceStage] Started timer for ${activeStage.ttl}`)
+    clearInterval(this.timers[payload.code]);
+    this.timers[payload.code] = setInterval(() => {
+      const stage = room.game.stages.get(room.game.activeStage);
+      stage.ttl--;
+      room.game.stages.set(room.game.activeStage, stage);
+      this.rooms.set(room.code, room);
+      this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
+      if (stage.ttl === 0) {
+        this.logger.log(`[handleAdvanceStage] Timer expired`)
+        clearInterval(this.timers[payload.code]);
+      }
+    }, 1000);
 
     this.server.to(payload.code).emit('updateRoom', { room: room.toPlain() });
 
